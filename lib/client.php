@@ -2,18 +2,22 @@
 
 class client {
 
-	$port_num = 0;
+	public $port_num = 0;
+    public $process_id = 0;
+    public $name = "";
+    public $ip = "127.0.0.1";
 
 	//clients connections
-	$snd_msg_sockets = array();
-	$rcv_msg_socket = NULL;
-
+	public $client_connections = array();
 
 	//blockchain connection
-	$bc_socket = NULL;
+	public $blockchain_connection = NULL;
 
-	public function __construct($port_num){ 
-        //TODO:create client object here!
+	public function __construct($port_num, $process_id, $name, $ip){ 
+        $this->port_num = $port_num;
+        $this->process_id = $process_id;
+        $this->name = $name;
+        $this->ip = $ip;
     }
 
     public function check_balance(){
@@ -28,6 +32,11 @@ class client {
 
     }
 
+    //This funciton is used to bind a socket for this client so that he can receive msg from others.
+    public function create_client_rec_msg_sockets(){
+
+
+    }
 
 
 }

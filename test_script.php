@@ -1,4 +1,5 @@
 <?php
+/*
 function non_block_read($fd, &$data) {
     $read = array($fd);
     $write = array();
@@ -21,3 +22,13 @@ while(1) {
         // perform your processing here
     }
 }
+*/
+
+
+
+
+
+$sock = socket_create(AF_INET, SOCK_STREAM, getprotobyname('tcp'));
+$result = @socket_connect($sock, '127.0.0.1', 3001);
+
+echo $result ? '1' : '0';

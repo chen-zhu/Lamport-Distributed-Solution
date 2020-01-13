@@ -5,28 +5,29 @@
 		<client>
 			<name>A</name>
 			<process_id>1</process_id>
-			<ip>localhost</ip>
+			<ip>127.0.0.1</ip>
 			<port>3001</port>
 		</client>
 
 		<client>
 			<name>B</name>
 			<process_id>2</process_id>
-			<ip>localhost</ip>
+			<ip>127.0.0.1</ip>
 			<port>3002</port>
 		</client>
 
 		<client>
 			<name>C</name>
-			<process_id>2</process_id>
-			<ip>localhost</ip>
+			<process_id>3</process_id>
+			<ip>127.0.0.1</ip>
 			<port>3003</port>
 		</client>
-		
+
 	</clients>	
 
 	<blockchain>
-		<ip>localhost</ip>
+		<name>blockchain</name>
+		<ip>127.0.0.1</ip>
 		<port>3000</port>
 	</blockchain>
 	
