@@ -27,8 +27,28 @@ while(1) {
 
 
 
-
+/*
 $sock = socket_create(AF_INET, SOCK_STREAM, getprotobyname('tcp'));
 $result = @socket_connect($sock, '127.0.0.1', 3001);
 
 echo $result ? '1' : '0';
+*/
+
+
+
+$stdin = fopen('php://stdin', 'r');
+$result = stream_set_blocking($stdin, false);
+
+do {
+  $line = fgets($stdin);
+
+  // No input right now
+  if (empty($line)) {
+    echo 'nothing input here';
+  }
+  else {
+    echo 'Input:' . $line;
+  }
+
+  sleep(2);
+} while (1);

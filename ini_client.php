@@ -2,9 +2,6 @@
 include "lib/client.php";
 include "lib/helper.php";
 include "lib/blockchain.php";
-//Initialize clients and make sure every client is actively listening.
-
-//obtain list of ports and cleint names. 
 
 if($argc !== 5){
 	die('usage: ini_client.php (port_num) (process_id) (client_names) (ip)');
@@ -40,6 +37,7 @@ foreach($clients_list as $c_info){
 	if($result){
 		echo "[Active Socket]Connected to the client {$c_info['name']}" . PHP_EOL;
 		@socket_write($sock, $argv[3], strlen($argv[3]));
+		socket_set_nonblock($sock);
 		$client->client_connections[$c_info['name']] = $sock;
 	} else {
 		echo "[Active Socket]Cannot reach the client {$c_info['name']}" . PHP_EOL;
@@ -48,7 +46,7 @@ foreach($clients_list as $c_info){
 }
 
 //2. Done with connecting with all clients, then open listen server mode.
-echo PHP_EOL . 'Client enters passive connecting mode......' . PHP_EOL;
+echo PHP_EOL . 'Client enters [Passive] connecting mode......' . PHP_EOL;
 $passive_sock = socket_create(AF_INET, SOCK_STREAM, getprotobyname('tcp'));
 socket_bind($passive_sock, $argv[4], $argv[1]);
 socket_listen($passive_sock, 24);
@@ -83,27 +81,51 @@ echo 'Clients Connections: ' . PHP_EOL;
 print_r($client->client_connections);
 echo PHP_EOL . 'Blockchain Connection: ' . PHP_EOL;
 print_r($client->blockchain_connection);
-echo PHP_EOL;
+echo PHP_EOL . PHP_EOL . 'Please type in command to perform Blockchain transaction or check balance.' . PHP_EOL;
+echo PHP_EOL . 'Ex. To transfer $3 to clinet B, please type \'B 3\'' . PHP_EOL;
+echo 'Ex. To check current balance, please type \'balance\'' . PHP_EOL;
 
-
+//Read from STDIN and set it as non-blocking. 
+//Yeahhhh im too lazy to deal with multi-threading.
+$stdin = fopen('php://stdin', 'r');
+$result = stream_set_blocking($stdin, false);
 
 //Inifinite loop here~
-/*while(1) {
+while(1) {
     $x = "";
-    if(helper::non_block_read(STDIN, $x)) {
-        echo "Input: " . $x . "\n";
+	$x = trim((string)fgets($stdin), "\n");
+    if(strlen($x) > 0) {
+    	//Type in format: Client balance. 
+		//Ex. B 10 ==> it means that give $10 from this client to B
+		$x = explode(' ', $x);
+    	//TODO: perform validation here!
+    	$send_to = $x[0];
+    	$msg = $x[1];
+    	if($send_to == 'blockchain'){
+    		//do somethig blockchain here~
+    	} elseif($client->client_connections[$send_to] !== NULL){
+    		socket_write($client->client_connections[$send_to], $msg, strlen($msg));
+    	} else {
+    		echo "Invalid input. Or the client does not exist." . PHP_EOL;
+    	}
     } else {
-        echo "I am waiting for your input~." . PHP_EOL;
-        sleep(2); 
+        //loop through each socket and check if there is any message from others!
+    	foreach($client->client_connections as $c_name => $sock){
+    		#echo "Before Socket Read ---  ";
+    		$input = socket_read($sock, 1024);
+    		#echo "After Socket Rread." . PHP_EOL; 
+    		if($input){
+	    		echo "Client $c_name sent me a message: " . trim($input, "\n") . PHP_EOL;
+	    	}
+    	}
     }
-
-
-
-
-
-
-
 
 }
 
-*/
+
+
+
+
+
+
+

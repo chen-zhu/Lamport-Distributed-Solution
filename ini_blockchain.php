@@ -9,7 +9,7 @@ echo PHP_EOL .
  	'*****************************************************' . PHP_EOL;
 
 $clients_list = helper::list_clients();
-$blockchain = new blockchain;
+$blockchain = new blockchain($clients_list);
 
 
 //blockchain server will issue connections to all clients one by one!
@@ -24,6 +24,7 @@ foreach($clients_list as $c_info){
 	if($result){
 		echo "[Active Socket]Connected to the client {$c_info['name']}" . PHP_EOL;
 		@socket_write($sock, 'blockchain', strlen('blockchain'));
+		socket_set_nonblock($sock);
 		$blockchain->client_connections[$c_info['name']] = $sock;
 	} 
 }
@@ -31,3 +32,12 @@ foreach($clients_list as $c_info){
 echo 'Blockchain\'s all clients connections: ' . PHP_EOL;
 print_r($blockchain->client_connections);
 echo PHP_EOL;
+
+echo 'Blockchain Trx List: ' . PHP_EOL;
+print_r($blockchain->transactions);
+echo PHP_EOL;
+
+
+while(1) {
+	//DO something here to keep it running~
+}

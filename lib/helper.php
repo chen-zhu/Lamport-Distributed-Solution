@@ -13,6 +13,11 @@ class helper {
 	    return true;
 	}
 
+#	public static function non_blocking(){
+#		$stdin = fopen('php://stdin', 'r');
+#		$result = stream_set_blocking($stdin, false);
+#	}
+
 	public static function list_clients(){
 		$xml = simplexml_load_file(__DIR__.'/../config/connections.xml');
 		$clients_info = array();

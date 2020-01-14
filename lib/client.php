@@ -13,12 +13,31 @@ class client {
 	//blockchain connection
 	public $blockchain_connection = NULL;
 
+    //todo: make this part private!
+    public $lock_queue = array();
+
 	public function __construct($port_num, $process_id, $name, $ip){ 
         $this->port_num = $port_num;
         $this->process_id = $process_id;
         $this->name = $name;
         $this->ip = $ip;
     }
+
+    
+    public function request(){
+
+    }
+
+    public function reply(){
+
+    }
+
+    public function release(){
+
+    }
+
+
+
 
     public function check_balance(){
 
