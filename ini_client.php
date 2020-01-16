@@ -91,6 +91,7 @@ $stdin = fopen('php://stdin', 'r');
 $result = stream_set_blocking($stdin, false);
 
 //Inifinite loop here~
+//Everything in the following loop has been set to non-blcking mode --> Simulate Threading!
 while(1) {
     $x = "";
 	$x = trim((string)fgets($stdin), "\n");
@@ -104,7 +105,9 @@ while(1) {
     	if($send_to == 'blockchain'){
     		//do somethig blockchain here~
     	} elseif($client->client_connections[$send_to] !== NULL){
-    		socket_write($client->client_connections[$send_to], $msg, strlen($msg));
+    		$time = time(); //unix timestamp.
+    		#socket_write($client->client_connections[$send_to], $msg, strlen($msg));
+    		$client->process_request($send_to, $msg, $time);
     	} else {
     		echo "Invalid input. Or the client does not exist." . PHP_EOL;
     	}
@@ -113,9 +116,10 @@ while(1) {
     	foreach($client->client_connections as $c_name => $sock){
     		#echo "Before Socket Read ---  ";
     		$input = socket_read($sock, 1024);
+    		$input = trim($input, "\n");
     		#echo "After Socket Rread." . PHP_EOL; 
     		if($input){
-	    		echo "Client $c_name sent me a message: " . trim($input, "\n") . PHP_EOL;
+	    		echo "Client $c_name sent me a message: " . $input . PHP_EOL;
 	    	}
     	}
     }
