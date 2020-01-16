@@ -58,6 +58,7 @@ while (len(client_sockets) < len(clients_list) - 1 or blockchain_socket is None)
 	else:
 		client_sockets.append(conn)
 
+
 #check if this client is currently on the top of queue. 
 #check after: 
 # 		1. receiving reply from clients.
@@ -110,12 +111,12 @@ def process_input_request(reuqest_body, lock):
 
 
 def process_received_msg(msg, lock, socket):
-	print("\n[Received]: " + msg + "\n")
+	#print("\n[Received]: " + msg + "\n")
 	received = json.loads(msg) 
-#message type: 1. request type from all others & add to local queue & sort 2. Release request from all others.
-# 1. request 
-# 2. reply 
-# 3. release
+	#message type: 1. request type from all others & add to local queue & sort 2. Release request from all others.
+	# 1. request 
+	# 2. reply 
+	# 3. release
 	if received['type'] == 'request':
 		lock.acquire()
 		#a. insert
@@ -141,9 +142,21 @@ def process_received_msg(msg, lock, socket):
 		socket.sendall(json_body)
 
 	elif received['type'] == 'reply': 
-		print("received reply.\n")
-		#todo: look up local queue and increase number!
+		lock.acquire()
+		queue_copy = queue.Queue()
+		while not request_queue.empty(): 
+			item = request_queue.get()
+			#check of it is the matching event/request
+			if item['from'] == str(received["from"]) and item['to'] == str(received["to"]) and item['time'] == int(received["time"]): 
+				#print("received reply. increment!")
+				item["reply_count"] += 1
+			queue_copy.put(item)
+
+		#then put everything back!
+		while not queue_copy.empty(): 
+			request_queue.put(queue_copy.get())
 		
+		lock.release()
 		check_queue_top(lock)
 	elif received['type'] == 'release':
 		print('released release')
@@ -168,6 +181,15 @@ for c_socket in client_sockets:
 	#process.daemon = True
 	process.start()
 
+def blockchain_response(socket, lock):
+	while True:
+		data = socket.recv(1024)
+		if len(data)>0: 
+			print("Blance: " + data)
+
+process = multiprocessing.Process(target=blockchain_response, args=(blockchain_socket, lock, ))
+process.start()
+
 print("Please type in command to perform Blockchain transaction or check balance.\n")
 print("Ex. To transfer $3 to clinet B, please type \'B 3\' \nEx. To check current balance, please type \'balance\'\n")
 
@@ -184,7 +206,7 @@ while True:
 			"from": sys.argv[3],
 			"to": split[0],
 			"msg": split[1],
-			"time": time.time(),
+			"time": int(time.time()),
 			"process_id": sys.argv[2],
 			"reply_count": 0, 
 			"type": "request" 
@@ -197,7 +219,7 @@ while True:
 			"from": sys.argv[3],
 			"to": "__none__",
 			"msg": split[0],
-			"time": time.time(),
+			"time": int(time.time()),
 			"process_id": sys.argv[2],
 			"reply_count": 0, 
 			"type": "request" 

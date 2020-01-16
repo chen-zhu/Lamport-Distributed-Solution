@@ -26,6 +26,7 @@ for c_info in clients_list:
 	try:
 		sock.connect((c_info['ip'], int(c_info['port'])))
 		sock.sendall('blockchain')
+		sock.setblocking(0)
 		blockchain_connections.append(sock)
 		print("[Active Socket]Connected to the client " + c_info['name'] + "\n")
 	except socket_error as serr:
@@ -43,9 +44,9 @@ def balance(client_name):
 	balance = 0
 	for trx in blockchain_transactions:
 		if trx['from'] == client_name:
-			balance -= trx['amount']
+			balance -= int(trx['amount'])
 		elif trx['to'] == client_name: 
-			balance += trx['amount']
+			balance += int(trx['amount'])
 	return balance
 
 
@@ -53,21 +54,24 @@ def balance(client_name):
 while True: 
 	#keep listen for command.
 	for socket in blockchain_connections:
-		data = socket.recv(1024)
-		if len(data)>0: 
-			#1. json decode! 
-			request = json.loads(data)
-			if request['msg'] == 'balance': 
-				final_balance = balance(request['from'])
-				socket.sendall(final_balance)
-			else: 
-				insert = {"from":request["from"], "to":request["to"], "amount":request["msg"]}
-				blockchain_transactions.append(insert)
-				print("inserted into blcokchain transaction.\n")
-				print(blockchain_transactions)
-				#insert transaction!
-
-
+		#print(".")
+		#time.sleep(2)
+		try:
+			data = socket.recv(1024)
+			if len(data)>0: 
+				#1. json decode! 
+				request = json.loads(data)
+				if request['msg'] == 'balance': 
+					final_balance = balance(request['from'])
+					socket.sendall(str(final_balance))
+				else: 
+					insert = {"from":str(request["from"]), "to":str(request["to"]), "amount":str(request["msg"])}
+					blockchain_transactions.append(insert)
+					print("inserted into blcokchain transaction.\n")
+					print(blockchain_transactions)
+					#insert transaction!
+		except socket_error as serr:
+			a=1
 
 
 
