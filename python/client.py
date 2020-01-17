@@ -22,6 +22,7 @@ clients_list = list_clients()
 client_sockets = []
 lock = multiprocessing.Lock()
 
+#client's local queue to store all request.
 request_queue = multiprocessing.Queue()
 
 #active mode connecting here!
@@ -57,6 +58,24 @@ while (len(client_sockets) < len(clients_list) - 1 or blockchain_socket is None)
 		break
 	else:
 		client_sockets.append(conn)
+
+
+#spevial algorithm that helps us to sort list!
+def sort_by_time_process_id(val):
+	return  int(val['time']) * 10 + int(val['process_id'])
+
+
+#unfortunately, regarding the multiprocessing, we can only utilize multiprocessing.queue as shared memory obj. 
+#therefore, manually multiprocessing.queue sorting is required.
+def sort_queue():
+	tmp_list = []
+	while not request_queue.empty(): 
+			item = request_queue.get()
+			tmp_list.append(item)
+	tmp_list.sort(key = sort_by_time_process_id, reverse = True)
+	#then put sorted back to queue!
+	while len(tmp_list):
+		request_queue.put(tmp_list.pop())
 
 
 #check if this client is currently on the top of queue. 
@@ -101,7 +120,7 @@ def process_input_request(reuqest_body, lock):
 	request_queue.put(reuqest_body)
 
 	#2. order self queue. 
-	#TODO: Sort queue.
+	sort_queue()
 	lock.release()
 
 	#3. Broadcast~ 
@@ -131,9 +150,10 @@ def process_received_msg(msg, lock, socket):
 			"type": str(received["type"])
 		}
 		request_queue.put(insert)
-		print('received request.')
+		#print('received request.')
 
-		#b. TODO: sort queue.
+		#b. sort queue.
+		sort_queue()
 		lock.release()
 
 		#c. reply!
@@ -159,10 +179,12 @@ def process_received_msg(msg, lock, socket):
 		lock.release()
 		check_queue_top(lock)
 	elif received['type'] == 'release':
-		print('released release')
-		#todo: remove from local queue!
+		#print('released release')
+		lock.acquire()
+		dequeue = request_queue.get()
+		#print("Deleted record: " + json.dumps(dequeue))
+		lock.release()
 		check_queue_top(lock)
-
 
 
 #each client's socket keeps checking message in sub thread.
@@ -185,7 +207,7 @@ def blockchain_response(socket, lock):
 	while True:
 		data = socket.recv(1024)
 		if len(data)>0: 
-			print("Blance: " + data)
+			print("Blockchain Response: " + data)
 
 process = multiprocessing.Process(target=blockchain_response, args=(blockchain_socket, lock, ))
 process.start()
@@ -194,14 +216,20 @@ print("Please type in command to perform Blockchain transaction or check balance
 print("Ex. To transfer $3 to clinet B, please type \'B 3\' \nEx. To check current balance, please type \'balance\'\n")
 
 while True:
-	text = raw_input("Command: ")
+	text = raw_input("")
 	split = text.split()
 	if len(split) == 0: 
 		continue
 	elif len(split) == 2: 
 		if to_client_exist(split[0]) == False:
 			print("Client does not exist.\n")
-			continue;
+			continue
+		elif split[0] == sys.argv[3]:
+			print("Cannot transfer money to self!")
+			continue
+		if int(split[1]) < 0:
+			print("Invalid Amount. Transaction amount must be a positive integer.")
+			continue
 		reuqest_body = {
 			"from": sys.argv[3],
 			"to": split[0],
@@ -235,6 +263,9 @@ while True:
 			item = request_queue.get()
 			print(item)
 			queue_copy.put(item)
+
+		if queue_copy.empty():
+			print("[Debug]: No items on the local queue!")
 
 		#then put everything back!
 		while not queue_copy.empty(): 

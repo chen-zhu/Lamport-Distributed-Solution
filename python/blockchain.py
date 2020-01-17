@@ -61,15 +61,22 @@ while True:
 			if len(data)>0: 
 				#1. json decode! 
 				request = json.loads(data)
+				final_balance = balance(request['from'])
+
 				if request['msg'] == 'balance': 
-					final_balance = balance(request['from'])
+					#final_balance = balance(request['from'])
 					socket.sendall(str(final_balance))
 				else: 
-					insert = {"from":str(request["from"]), "to":str(request["to"]), "amount":str(request["msg"])}
-					blockchain_transactions.append(insert)
-					print("inserted into blcokchain transaction.\n")
-					print(blockchain_transactions)
-					#insert transaction!
+					#TODO: check if the client has enough balance to deduct.
+					if final_balance < int(request["msg"]): 
+						socket.sendall("Transaction Failed. Incorrect Amount.")
+					else: 
+						insert = {"from":str(request["from"]), "to":str(request["to"]), "amount":str(request["msg"])}
+						blockchain_transactions.append(insert)
+						print("inserted into blcokchain transaction.\n")
+						print(blockchain_transactions)
+						socket.sendall("Transaction Success")
+						#insert transaction!
 		except socket_error as serr:
 			a=1
 
