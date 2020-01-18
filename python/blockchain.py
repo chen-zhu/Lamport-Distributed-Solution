@@ -8,6 +8,8 @@ import sys
 import json
 from helper import list_clients
 from socket import error as socket_error
+from helper import list_clients, to_client_exist, randomId, randomSleep
+
 
 print("*****************************************************\nBlockchain Main Server\n'*****************************************************\n\n")
 
@@ -51,6 +53,7 @@ def balance(client_name):
 
 
 #blockchain server only need single thread because only one server can enter cretical section!
+#All sockets have non-blocking mode~! 
 while True: 
 	#keep listen for command.
 	for socket in blockchain_connections:
@@ -59,22 +62,26 @@ while True:
 		try:
 			data = socket.recv(1024)
 			if len(data)>0: 
+				print('recieved traffic: ' + data + "\n")
 				#1. json decode! 
 				request = json.loads(data)
 				final_balance = balance(request['from'])
 
 				if request['msg'] == 'balance': 
 					#final_balance = balance(request['from'])
+					#randomSleep()
 					socket.sendall(str(final_balance))
 				else: 
 					#TODO: check if the client has enough balance to deduct.
 					if final_balance < int(request["msg"]): 
+						#randomSleep()
 						socket.sendall("Transaction Failed. Incorrect Amount.")
 					else: 
 						insert = {"from":str(request["from"]), "to":str(request["to"]), "amount":str(request["msg"])}
 						blockchain_transactions.append(insert)
 						print("inserted into blcokchain transaction.\n")
 						print(blockchain_transactions)
+						#randomSleep()
 						socket.sendall("Transaction Success")
 						#insert transaction!
 		except socket_error as serr:
