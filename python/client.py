@@ -102,6 +102,7 @@ def check_queue_top(lock):
 	lock.acquire()
 
 	if not request_queue.empty(): 
+		time.sleep(1)
 		top_one = request_queue.get()
 		#print(top_one)
 
@@ -126,19 +127,6 @@ def check_queue_top(lock):
 		else: 
 			request_queue.put(top_one) 
 			sort_queue(request_queue)
-			#do something here to resume queue!
-			#queue_copy = queue.Queue()
-			#queue_copy.put(top_one)
-
-			#while not request_queue.empty(): 
-			#	item = request_queue.get()
-			#	queue_copy.put(item)
-
-			#then put everything back!
-			#while not queue_copy.empty(): 
-			#	request_queue.put(queue_copy.get())
-	#else :
-	#	print("not entered.")
 
 	lock.release()
 
@@ -164,11 +152,14 @@ def process_input_request(reuqest_body, lock):
 
 def process_received_msg(msg, lock, socket):
 	#print("\n[Received]: " + msg + "\n")
-	received = json.loads(msg) 
+	try:
+		received = json.loads(msg) 
+	except ValueError:
+		print("Json decode failed. " + msg)
 	#update local clock!
 	lock.acquire()
 	update_clock(int(received["time"]))
-	#print('Update clock to ' + str(clock.value) + " - " +  str(received["type"]))
+	#print('Received ' + received["type"] + " with from " +  str(received["from"]))
 	lock.release()
 
 	#print("[Received msg with type " + str(received["type"]) + " " + str(received["from"]) + " " + str(received["to"]) + "]")
@@ -178,6 +169,7 @@ def process_received_msg(msg, lock, socket):
 	# 3. release
 	if received['type'] == 'request':
 		lock.acquire()
+		#print('Received request with from ' +  str(received["from"]))
 		#a. insert
 		#donno know to json decode to dictionary
 		insert = {
@@ -195,27 +187,30 @@ def process_received_msg(msg, lock, socket):
 
 		#b. sort queue.
 		sort_queue(request_queue)
-		lock.release()
 
 		#c. reply!
 		update_clock(clock.value)
 		#print('Before sending, update clock to ' + str(clock.value))
-		print('Reply to verify ID: ' + str(received["verify"]))
+		print('Reply to ' + received["from"] + ' for verify ID: ' + str(received["verify"]))
 		received['type'] = 'reply'
+		received['turnback_agent'] = sys.argv[3]
 		received['time'] = clock.value #update time to local clock~~
 		json_body = json.dumps(received)
 		#randomSleep()
 		socket.sendall(json_body)
+		lock.release()
 		check_queue_top(lock)
 	elif received['type'] == 'reply': 
 		lock.acquire()
 		queue_copy = queue.Queue()
+		time.sleep(1)
+		#print("Enter reply check: " + str(received['verify']) + " turnback agent: " + str(received["turnback_agent"]) )
 		while not request_queue.empty(): 
 			item = request_queue.get()
 			#check of it is the matching event/request
-			if item['from'] == str(received["from"]) and item['to'] == str(received["to"]) and item['verify'] == str(received["verify"]): 
-				item["reply_count"] += 1
-				print("received reply. increment!" + str(item["reply_count"]) + " - " + item['verify'])
+			if item['verify'] == str(received["verify"]): 
+				item["reply_count"] = item["reply_count"] + 1
+				#print("received reply. increment!" + str(item["reply_count"]) + " - " + item['verify'] + " turnback agent: " + str(received["turnback_agent"]) )
 			queue_copy.put(item)
 
 		#then put everything back!
@@ -227,8 +222,9 @@ def process_received_msg(msg, lock, socket):
 		time.sleep(1)
 		check_queue_top(lock)
 	elif received['type'] == 'release':
-		#print('released release')
+		#print('Received release with from ' +  str(received["from"]))
 		lock.acquire()
+		sort_queue(request_queue)
 		dequeue = request_queue.get()
 		#print("Deleted record: " + json.dumps(dequeue))
 		lock.release()
@@ -236,27 +232,32 @@ def process_received_msg(msg, lock, socket):
 
 
 #each client's socket keeps checking message in sub thread.
-def socket_keep_receiving(socket, lock):
+def socket_keep_receiving(socket, lock, index):
 	while True:
-		#print("waiting for socket receive. " + str(socket.getsockname()[1]))
 		randomSleep()
 		lock.acquire()
 		sort_queue(request_queue)
 		lock.release()
+		#print("waiting for socket receive..." + str(index))
 		data = socket.recv(1024)
 		if len(data)>0: 
-			#if received data, put it in sub thread and process.
-			#process = multiprocessing.Process(target=process_received_msg, args=(data, lock, socket, ))
-			#process.daemon = True
-			#process.start()
-			process_received_msg(data, lock, socket)
-			time.sleep(1)
-			check_queue_top(lock)
+			print("received: " + data)
+			#thread & socket issue. 
+			new_json = data.replace("}{", "}-----{") 
+			split_list = new_json.split("-----")
+			for sl in split_list:
+				#if received data, put it in sub thread and process.
+				#process = multiprocessing.Process(target=process_received_msg, args=(data, lock, socket, ))
+				#process.daemon = True
+				#process.start()
+				process_received_msg(sl, lock, socket)
+				time.sleep(1)
+				check_queue_top(lock)
 		
 
 #create threads for each connected socket so that it keeps receiving message.
 for c_socket in client_sockets:
-	process = multiprocessing.Process(target=socket_keep_receiving, args=(c_socket, lock, ))
+	process = multiprocessing.Process(target=socket_keep_receiving, args=(c_socket, lock, client_sockets.index(c_socket)))
 	#process.daemon = True
 	process.start()
 
