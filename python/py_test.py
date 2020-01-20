@@ -35,7 +35,7 @@ p1 = multiprocessing.Process(target=square_list, args=(mylist, ))
 p1.start() 
 
 # wait until process is finished 
-p1.join() 
+#p1.join() 
 
 # print result array 
 print("Result(in main program): {}".format(result[:])) 
