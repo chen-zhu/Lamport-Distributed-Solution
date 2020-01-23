@@ -11,6 +11,7 @@ import queue
 import random
 import string
 import signal
+import copy
 
 import threading
 
@@ -27,15 +28,11 @@ print("*****************************************************\n Client Name: " + 
 clients_list = list_clients()
 client_sockets = []
 
-
 lock = threading.Lock()
 request_queue = queue.Queue()
+#request_list = []
+
 clock = 0
-#client's local queue to store all request.
-#request_queue = multiprocessing.Queue()
-#lock = multiprocessing.Lock()
-#clock = multiprocessing.Value('i')
-#clock = 0
 
 #active mode connecting here!
 for c_info in clients_list: 
@@ -72,13 +69,6 @@ while (len(client_sockets) < len(clients_list) - 1 or blockchain_socket is None)
 		client_sockets.append(conn)
 
 
-#def signal_handler(signal, frame):
-#	for c_socket in client_sockets:
-#		c_socket.close()
-#	sys.exit(0)
-
-#signal.signal(signal.SIGINT, signal_handler)
-
 def update_clock(received_time):
 	global clock 
 	clock = max(clock, received_time) + 1
@@ -87,6 +77,12 @@ def update_clock(received_time):
 def sort_by_time_process_id(val):
 	return  int(val['time']) * 10 + int(val['process_id'])
 
+def print_queue(queue_to_be_sorted):
+	cpy = copy.deepcopy(queue_to_be_sorted)
+	while not cpy.empty(): 
+		item = cpy.get()
+		print(item)
+	
 #unfortunately, regarding the multiprocessing, we can only utilize multiprocessing.queue as shared memory obj. 
 #therefore, manually multiprocessing.queue sorting is required.
 def sort_queue(request_queue):
@@ -107,9 +103,11 @@ def sort_queue(request_queue):
 #		3. dequeue
 def check_queue_top(lock): 
 	global request_queue
+	global clock
 	lock.acquire()
 
 	if not request_queue.empty(): 
+		sort_queue(request_queue)
 		#time.sleep(1)
 		top_one = request_queue.get()
 		#print(top_one)
@@ -119,6 +117,7 @@ def check_queue_top(lock):
 
 			#push to blockchain 
 			json_body = json.dumps(top_one)
+			#print(time.strftime("%H:%M:%S", time.localtime()) + " -> Client " + sys.argv[3] + " enters critical section. ")
 			#print('sending to blcok chain: ' + json_body)
 			#randomSleep()
 			blockchain_socket.sendall(json_body)
@@ -127,10 +126,10 @@ def check_queue_top(lock):
 			top_one['type'] = 'release'
 			for c_socket in client_sockets:
 				update_clock(clock)
-				#print('Send releas with updated time: ' + str(clock))
+				print('>>>Sent mgs type: [release] for verify_id: ' + str(top_one["verify"]) + ". Msg clock value: " + str(clock))
 				top_one['time'] = clock
 				json_body = json.dumps(top_one)
-				#randomSleep()
+				randomSleep()
 				c_socket.sendall(json_body)
 		else: 
 			request_queue.put(top_one) 
@@ -141,9 +140,11 @@ def check_queue_top(lock):
 
 def process_input_request(reuqest_body, lock): 
 	global request_queue
+	global clock
 	#1. add it self queue
 	lock.acquire()
-	request_queue.put(reuqest_body)
+	#print("Put into queue with clock: " + str(clock))
+	request_queue.put(copy.deepcopy(reuqest_body)) #hummm not sure how python pass by reference work.
 
 	#2. order self queue. 
 	sort_queue(request_queue)
@@ -151,16 +152,20 @@ def process_input_request(reuqest_body, lock):
 
 	#3. Broadcast~ 
 	for c_socket in client_sockets:
+		lock.acquire()
 		update_clock(clock)
 		reuqest_body['time'] = clock
+		print('>>>Sent mgs type: [request] for verify_id: ' + str(reuqest_body["verify"]) + '. Msg clock value: ' + str(reuqest_body["time"]))
+		lock.release()
 		#print("send clock " + str(clock))
+		#DO NOT PUT SLEEP HERE! IT WOULD SCREW UP TIME! 
 		json_body = json.dumps(reuqest_body)
-		#randomSleep()
 		c_socket.sendall(json_body)
 
 
 def process_received_msg(msg, lock, socket):
 	global request_queue
+	global clock
 	#print("\n[Received]: " + msg + "\n")
 	try:
 		received = json.loads(msg) 
@@ -169,7 +174,7 @@ def process_received_msg(msg, lock, socket):
 	#update local clock!
 	lock.acquire()
 	update_clock(int(received["time"]))
-	#print('Received ' + received["type"] + " with from " +  str(received["from"]))
+	print('<<<Received msg type: [' + received["type"] + "] with verify_id: " +  str(received["verify"]) + ". Received Time: " + str(received["time"]) + ". Adj Local Time To " + str(clock))
 	lock.release()
 
 	#print("[Received msg with type " + str(received["type"]) + " " + str(received["from"]) + " " + str(received["to"]) + "]")
@@ -197,23 +202,36 @@ def process_received_msg(msg, lock, socket):
 
 		#b. sort queue.
 		sort_queue(request_queue)
+		print("Sorted Queue: ")
+		queue_copy = queue.Queue()
+
+		while not request_queue.empty(): 
+			item = request_queue.get()
+			print(item)
+			queue_copy.put(item)
+
+		if queue_copy.empty():
+			print("[Debug]: No items on the local queue!")
+
+		#then put everything back!
+		while not queue_copy.empty(): 
+			request_queue.put(queue_copy.get())
 
 		#c. reply!
 		update_clock(clock)
 		#print('Before sending, update clock to ' + str(clock))
-		print('Reply to ' + received["from"] + ' for verify ID: ' + str(received["verify"]))
+		print('>>>Sent mgs type: [reply] to ' + received["from"] + ' for verify_id: ' + str(received["verify"]) + ". Msg Clock Value: " + str(clock))
 		received['type'] = 'reply'
 		received['turnback_agent'] = sys.argv[3]
 		received['time'] = clock #update time to local clock~~
 		json_body = json.dumps(received)
-		#randomSleep()
+		randomSleep()
 		socket.sendall(json_body)
 		lock.release()
 		check_queue_top(lock)
 	elif received['type'] == 'reply': 
 		lock.acquire()
 		queue_copy = queue.Queue()
-		#time.sleep(1)
 		#print("Enter reply check: " + str(received['verify']) + " turnback agent: " + str(received["turnback_agent"]) )
 		while not request_queue.empty(): 
 			item = request_queue.get()
@@ -245,22 +263,20 @@ def process_received_msg(msg, lock, socket):
 def socket_keep_receiving(socket, lock, index):
 	global request_queue
 	while True:
-		randomSleep()
+		#time.sleep(5)
 		lock.acquire()
 		sort_queue(request_queue)
 		lock.release()
 		#print("waiting for socket receive..." + str(index))
 		data = socket.recv(1024)
 		if len(data)>0: 
-			print("received: " + data)
+			randomSleep()
+			#print("received: " + data)
 			#thread & socket issue. 
 			new_json = data.replace("}{", "}-----{") 
 			split_list = new_json.split("-----")
 			for sl in split_list:
-				process_received_msg(sl, lock, socket)
-				#time.sleep(1)
-				check_queue_top(lock)
-		
+				process_received_msg(sl, lock, socket)		
 
 #create threads for each connected socket so that it keeps receiving message.
 for c_socket in client_sockets:
@@ -272,7 +288,7 @@ def blockchain_response(socket, lock):
 	while True:
 		data = socket.recv(1024)
 		if len(data)>0: 
-			print("Blockchain Response: " + data)
+			print("*** Blockchain Response *** " + data)
 
 process = threading.Thread(target=blockchain_response, args=(blockchain_socket, lock, ))
 process.start()
@@ -295,6 +311,7 @@ while True:
 		if not split[1].isdigit() or int(split[1]) < 0 :
 			print("Invalid Amount. Transaction amount must be a positive integer.")
 			continue
+		lock.acquire()
 		update_clock(clock)
 		reuqest_body = {
 			"from": sys.argv[3],
@@ -306,10 +323,12 @@ while True:
 			"type": "request", 
 			"verify": randomId()
 		}
+		lock.release()
 		process = threading.Thread(target=process_input_request, args=(reuqest_body, lock, ))
 		#process.daemon = True
 		process.start()
 	elif split[0] == 'balance':
+		lock.acquire()
 		update_clock(clock)
 		reuqest_body = {
 			"from": sys.argv[3],
@@ -321,12 +340,13 @@ while True:
 			"type": "request", 
 			"verify": randomId()
 		}
+		lock.release()
 		process = threading.Thread(target=process_input_request, args=(reuqest_body, lock, ))
 		#process.daemon = True
 		process.start()
 	elif split[0] == 'check':
 		lock.acquire()
-		print('Clock: ' + str(clock))
+		print('Local Clock: ' + str(clock))
 
 		queue_copy = queue.Queue()
 

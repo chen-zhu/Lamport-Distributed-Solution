@@ -7,7 +7,6 @@ import xml.etree.ElementTree as ET
 import random
 import string
 from random import randint
-from time import sleep
 
 def list_clients(): 
 	tree = ET.parse('config/connections.xml')
@@ -31,5 +30,6 @@ def randomId(stringLength=5):
 
 def randomSleep():
 	#print('Network Delay Mocking: sleep. ')
-	sleep(randint(0,3))
+	#time.sleep(randint(1,5))
+	time.sleep(5)
 	#print('Network Delay Mocking: sleep ends. ')

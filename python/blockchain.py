@@ -38,6 +38,7 @@ print("Successfully connected to all clients\n")
 #print(blockchain_connections)
 #print("\n")
 print(blockchain_transactions)
+print("\n")
 
 
 def balance(client_name): 
@@ -77,12 +78,15 @@ while True:
 						#randomSleep()
 						socket.sendall("Transaction Failed. Incorrect Amount.")
 					else: 
+						before = balance(request['from'])
 						insert = {"from":str(request["from"]), "to":str(request["to"]), "amount":str(request["msg"])}
 						blockchain_transactions.append(insert)
-						print("inserted into blcokchain transaction.\n")
+						print("inserted into blcokchain transaction. Blockchain current TRX records: ")
 						print(blockchain_transactions)
+						print("\n")
+						after = balance(request['from'])
 						#randomSleep()
-						socket.sendall("Transaction Success")
+						socket.sendall("Transaction Success. " + "Old Balance: " + str(before) + ". New Balance: " + str(after))
 						#insert transaction!
 		except socket_error as serr:
 			a=1
