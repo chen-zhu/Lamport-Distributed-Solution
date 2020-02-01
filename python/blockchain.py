@@ -35,8 +35,6 @@ for c_info in clients_list:
 		print("[Active Socket]Cannot reach the client " + c_info['name'] + "\n")
 
 print("Successfully connected to all clients\n")
-#print(blockchain_connections)
-#print("\n")
 print(blockchain_transactions)
 print("\n")
 
@@ -58,8 +56,6 @@ def balance(client_name):
 while True: 
 	#keep listen for command.
 	for socket in blockchain_connections:
-		#print(".")
-		#time.sleep(2)
 		try:
 			data = socket.recv(1024)
 			if len(data)>0: 
@@ -73,7 +69,6 @@ while True:
 					#randomSleep()
 					socket.sendall(str(final_balance))
 				else: 
-					#TODO: check if the client has enough balance to deduct.
 					if final_balance < int(request["msg"]): 
 						#randomSleep()
 						socket.sendall("Transaction Failed. Incorrect Amount.")
